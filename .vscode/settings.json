@@ -1,0 +1,13 @@
+{
+  "files.associations": {
+    "thread": "cpp",
+    "vector": "cpp",
+    "iostream": "cpp",
+    "xmemory": "cpp",
+    "functional": "cpp",
+    "memory": "cpp",
+    "array": "cpp",
+    "xstring": "cpp",
+    "xutility": "cpp"
+  }
+}
