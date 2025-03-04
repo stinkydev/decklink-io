@@ -24,6 +24,6 @@ function(target_add_idl_files target)
     )
 
     set_source_files_properties(${idl_file} PROPERTIES HEADER_FILE_ONLY TRUE)
-    target_sources(${target} PUBLIC "${idl_file_source}" "${idl_file_header}")
+    target_sources(${target} PRIVATE "${idl_file_source}" "${idl_file_header}")
   endforeach()
 endfunction()

@@ -1,5 +1,4 @@
 #include "decklink-device-mgr.h"
-#include "decklink-device-instance.h"
 #include "decklink-device.h"
 
 namespace sesame_decklink {
@@ -44,12 +43,20 @@ std::vector<DecklinkDeviceInfo> DeviceManager::get_devices() {
   return result;
 }
 
-std::unique_ptr<DecklinkInput> DeviceManager::get_input_device(const int device_index, IDeckLinkMemoryAllocator* allocator, const int64_t group) {
+DecklinkInput* DeviceManager::get_input_device(const int device_index, IDeckLinkMemoryAllocator* allocator, const int64_t group) {
   if (device_index < 0 || device_index >= devices.size()) {
     return nullptr;
   }
 
-  return std::make_unique<DecklinkInput>(devices[device_index].get(), allocator, group);
+  return new DecklinkInput(devices[device_index].get(), allocator, group);
+}
+
+DecklinkOutput* DeviceManager::get_output_device(const int device_index, IDeckLinkMemoryAllocator* allocator) {
+  if (device_index < 0 || device_index >= devices.size()) {
+    return nullptr;
+  }
+
+  return new DecklinkOutput(devices[device_index].get(), allocator);
 }
 
 bool DeviceManager::set_device_profile(const int device_index, const BMDProfileID profile_id) {

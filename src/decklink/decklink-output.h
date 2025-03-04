@@ -1,6 +1,7 @@
 #pragma once
 
 #include "decklink-types.h"
+#include <decklink/platform.h>
 
 #include <atomic>
 
@@ -16,6 +17,8 @@ class DecklinkOutput : public IDeckLinkVideoOutputCallback, public IDeckLinkAudi
   IDeckLinkMemoryAllocator* allocator = nullptr;
 
   std::atomic<long> ref_count = 1;
+
+  bool started = false;
   
   BMDTimeScale time_scale = 0;
   BMDTimeValue frame_duration = 0;
@@ -30,6 +33,19 @@ class DecklinkOutput : public IDeckLinkVideoOutputCallback, public IDeckLinkAudi
  public:
   DecklinkOutput(DecklinkDevice* device, IDeckLinkMemoryAllocator* allocator);
   ~DecklinkOutput();
+
+  bool is_started() const {
+    return started;
+  }
+
+  bool get_hardware_time(BMDTimeValue* time);
+
+  std::string get_display_name() const {
+    return device->get_info().displayName;
+  }
+
+  uint32_t get_buffered_video_frames();
+  uint32_t get_buffered_audio_frames();
 
   bool start(const BMDDisplayMode mode, const int audio_channels, const bool rgba_mode);
   void stop();
@@ -48,7 +64,7 @@ class DecklinkOutput : public IDeckLinkVideoOutputCallback, public IDeckLinkAudi
 
   HRESULT STDMETHODCALLTYPE ScheduledFrameCompleted(IDeckLinkVideoFrame* completedFrame, BMDOutputFrameCompletionResult result);
   HRESULT STDMETHODCALLTYPE ScheduledPlaybackHasStopped();
-  HRESULT	STDMETHODCALLTYPE RenderAudioSamples(BOOL preroll);
+  HRESULT	STDMETHODCALLTYPE RenderAudioSamples(decklink_bool_t preroll);
 
   HRESULT STDMETHODCALLTYPE QueryInterface(REFIID iid, LPVOID* ppv);
   ULONG STDMETHODCALLTYPE AddRef();

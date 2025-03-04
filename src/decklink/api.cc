@@ -40,13 +40,25 @@ std::vector<DecklinkDeviceInfo> get_devices() {
   return mgr->get_devices();
 }
 
-std::unique_ptr<DecklinkInput> get_input_device(const int device_index, IDeckLinkMemoryAllocator* allocator, const int64_t group) {
+DecklinkInput* get_input_device(const int device_index, IDeckLinkMemoryAllocator* allocator, const int64_t group) {
   if (mgr == nullptr) {
     return nullptr;
   }
 
   try {
     return mgr->get_input_device(device_index, allocator, group);
+  } catch (std::exception&) {
+    return nullptr;
+  }
+}
+
+DecklinkOutput* get_output_device(const int device_index, IDeckLinkMemoryAllocator* allocator) {
+  if (mgr == nullptr) {
+    return nullptr;
+  }
+
+  try {
+    return mgr->get_output_device(device_index, allocator);
   } catch (std::exception&) {
     return nullptr;
   }

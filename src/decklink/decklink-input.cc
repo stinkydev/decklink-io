@@ -4,6 +4,25 @@
 
 namespace sesame_decklink {
 
+bool DecklinkInput::get_hardware_time(BMDTimeValue* time) {
+  BMDTimeValue hardware_time;
+  BMDTimeValue time_in_frame;
+  BMDTimeValue ticks_per_frame;
+  HRESULT ok;
+
+  if (input) {
+    ok = input->GetHardwareReferenceClock(DECKLINK_TIME_BASE, &hardware_time, &time_in_frame, &ticks_per_frame);
+  } else {
+    return false;
+  }
+
+  if (ok == S_OK) {
+    *time = hardware_time;
+    return true;
+  }
+  return false;
+}
+
 ULONG STDMETHODCALLTYPE DecklinkInput::AddRef() {
   return InterlockedIncrement(&ref_count);
 }
@@ -37,21 +56,10 @@ HRESULT STDMETHODCALLTYPE DecklinkInput::VideoInputFrameArrived(IDeckLinkVideoIn
   const auto has_audio = handle_audio(audio_packet);
   const auto has_video = handle_video(video_frame);
 
-  if (wants_restart) {
-    restart_streams();
-    wants_restart = false;
-    return S_OK;
-  }
-
   if (has_audio && has_video) {
-    if (audio.timestamp != video.timestamp) {
-     restart_streams();
-     return S_OK;
+    if (on_frame != nullptr) {
+      on_frame(&video, &audio);
     }
-  }
-
-  if (on_frame != nullptr) {
-    on_frame(&video, &audio);
   }
 
   return S_OK;
@@ -108,7 +116,6 @@ HRESULT STDMETHODCALLTYPE DecklinkInput::Notify(BMDNotifications topic, uint64_t
 	if (topic == bmdStatusChanged) {
 		if (param1 == bmdDeckLinkStatusVideoInputSignalLocked) {
       const auto locked = device->get_input_locked();
-      wants_restart = true;
 			if (on_input_signal_changed != nullptr) {
 				on_input_signal_changed(locked);
 			}

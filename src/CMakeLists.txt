@@ -30,7 +30,6 @@ target_sources(
   decklink/api.cc
   decklink/decklink-device-mgr.cc
   decklink/decklink-device.cc
-  decklink/decklink-device-instance.cc
   decklink/decklink-input.cc
   decklink/decklink-output.cc
 )
@@ -47,9 +46,10 @@ target_link_libraries(
 )
 
 if(WIN32)
-message(STATUS "Building for Windows")
+  message(STATUS "Building for Windows")
   include(cmake/idlfilehelper.cmake)
   target_add_idl_files(decklink win/decklink-sdk/DeckLinkAPI.idl)
+  set_source_files_properties(win/decklink-sdk/DeckLinkAPIVersion.h PROPERTIES GENERATED TRUE)
   set_source_files_properties(win/decklink-sdk/DeckLinkAPIVersion.h PROPERTIES GENERATED TRUE)
   target_sources(decklink-sdk INTERFACE win/decklink-sdk/DeckLinkAPIVersion.h)
  

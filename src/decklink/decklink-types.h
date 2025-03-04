@@ -1,7 +1,7 @@
 #pragma once
 
 #include <functional>
-#include <stdint.h>
+#include <cstdint>
 #include <DeckLinkAPI.h>
 
 #define DECKLINK_TIME_BASE 1000000000

@@ -19,7 +19,6 @@ private:
   IDeckLinkMemoryAllocator* allocator = nullptr;
 
   int64_t capture_group = 0;
-  bool wants_restart = false;
   bool started = false;
 
   DecklinkVideoFrameCallback on_frame = nullptr;
@@ -34,7 +33,12 @@ private:
   bool handle_audio(IDeckLinkAudioInputPacket* packet);
   bool handle_video(IDeckLinkVideoInputFrame* frame);
  public:
-  bool start(const BMDDisplayMode mode);
+ bool get_hardware_time(BMDTimeValue* time);
+ std::string get_display_name() const {
+    return device->get_info().displayName;
+  }
+
+ bool start(const BMDDisplayMode mode);
   void stop();
 
   void restart_streams() {

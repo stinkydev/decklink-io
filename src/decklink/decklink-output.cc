@@ -23,6 +23,25 @@ DecklinkOutput::~DecklinkOutput() {
   }
 }
 
+bool DecklinkOutput::get_hardware_time(BMDTimeValue* time) {
+  BMDTimeValue hardware_time;
+  BMDTimeValue time_in_frame;
+  BMDTimeValue ticks_per_frame;
+  HRESULT ok;
+
+  if (output) {
+    ok = output->GetHardwareReferenceClock(DECKLINK_TIME_BASE, &hardware_time, &time_in_frame, &ticks_per_frame);
+  } else {
+    return false;
+  }
+
+  if (ok == S_OK) {
+    *time = hardware_time;
+    return true;
+  }
+  return false;
+}
+
 bool DecklinkOutput::start(const BMDDisplayMode mode, const int audio_channels, const bool rgba_mode) {
   if (output == nullptr) {
     return false;
@@ -67,6 +86,8 @@ bool DecklinkOutput::start(const BMDDisplayMode mode, const int audio_channels, 
 }
 
 void DecklinkOutput::stop() {
+  started = false;
+
   if (output != nullptr) {
     output->DisableVideoOutput();
   }
@@ -81,6 +102,8 @@ bool DecklinkOutput::start_scheduled_playback() {
   if (res != S_OK) {
     return false;
   }
+
+  started = true;
 
   return true;
 }
@@ -115,6 +138,18 @@ bool DecklinkOutput::schedule_audio_packet(DecklinkAudioPacket* packet) {
   return true;
 }
 
+uint32_t DecklinkOutput::get_buffered_audio_frames() {
+  unsigned int buffered = 0;
+  output->GetBufferedAudioSampleFrameCount(&buffered);
+  return buffered;
+}
+
+uint32_t DecklinkOutput::get_buffered_video_frames() {
+  unsigned int buffered = 0;
+  output->GetBufferedVideoFrameCount(&buffered);
+  return buffered;
+}
+
 HRESULT STDMETHODCALLTYPE DecklinkOutput::ScheduledFrameCompleted(IDeckLinkVideoFrame* completedFrame, BMDOutputFrameCompletionResult result) {
 	BMDTimeValue val;
 	output->GetFrameCompletionReferenceTimestamp(completedFrame, DECKLINK_TIME_BASE, &val);
@@ -129,7 +164,7 @@ HRESULT STDMETHODCALLTYPE DecklinkOutput::ScheduledPlaybackHasStopped() {
   return S_OK;
 }
 
-HRESULT	STDMETHODCALLTYPE DecklinkOutput::RenderAudioSamples(BOOL preroll) {
+HRESULT	STDMETHODCALLTYPE DecklinkOutput::RenderAudioSamples(decklink_bool_t preroll) {
   if (on_render_audio != nullptr) {
     return on_render_audio(preroll) ? S_OK : E_FAIL;
   }

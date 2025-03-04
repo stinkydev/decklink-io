@@ -60,7 +60,8 @@ int main() {
     std::cout << "Press any key to stop" << std::endl;
     std::cin.get();
     input->stop();
-    input.reset();
+    input->Release();
+    sesame_decklink::api::deinitialize();
     return 0;
   } else {
     std::cout << "Failed to start input" << std::endl;

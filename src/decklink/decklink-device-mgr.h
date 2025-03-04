@@ -5,6 +5,7 @@
 #include "decklink-device.h"
 #include "decklink-device-enumerator.h"
 #include "decklink-input.h"
+#include "decklink-output.h"
 
 namespace sesame_decklink {
   class DecklinkDeviceInstance;
@@ -20,7 +21,8 @@ namespace sesame_decklink {
     void refresh_devices();
     std::vector<DecklinkDeviceInfo> get_devices();
 
-    std::unique_ptr<DecklinkInput> get_input_device(const int device_index, IDeckLinkMemoryAllocator* allocator, const int64_t group = 0);
+   DecklinkInput* get_input_device(const int device_index, IDeckLinkMemoryAllocator* allocator, const int64_t group = 0);
+   DecklinkOutput* get_output_device(const int device_index, IDeckLinkMemoryAllocator* allocator);
 
     bool set_device_profile(const int device_index, const BMDProfileID profile_id);
 
