@@ -93,6 +93,7 @@ bool DecklinkInput::handle_video(IDeckLinkVideoInputFrame* frame) {
     video.width = 0;
     video.height = 0;
     video.timestamp = 0;
+    video.hardware_time = 0;
     return false;
   }
 
@@ -105,6 +106,14 @@ bool DecklinkInput::handle_video(IDeckLinkVideoInputFrame* frame) {
   video.linesize[0] = frame->GetRowBytes();
   video.width = frame->GetWidth();
   video.height = frame->GetHeight();
+
+  BMDTimeValue hardware_time;
+  BMDTimeValue frame_duration;
+  if (frame->GetHardwareReferenceTimestamp(DECKLINK_TIME_BASE, &hardware_time, &frame_duration) == S_OK) {
+    video.hardware_time = hardware_time;
+  } else {
+    video.hardware_time = 0;
+  }
   return true;
 }
 

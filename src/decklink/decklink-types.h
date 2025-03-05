@@ -12,6 +12,7 @@ struct DecklinkVideoFrame {
   uint32_t width;
   uint32_t height;
   uint64_t timestamp;
+  uint64_t hardware_time;
   bool interlaced;
 };
 
