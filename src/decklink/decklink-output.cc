@@ -17,6 +17,7 @@ DecklinkOutput::DecklinkOutput(DecklinkDevice* device, IDeckLinkMemoryAllocator*
 
 DecklinkOutput::~DecklinkOutput() {
   if (output != nullptr) {
+    stop();
     output->SetVideoOutputFrameMemoryAllocator(nullptr);
     output->Release();
     output = nullptr;
@@ -47,6 +48,8 @@ bool DecklinkOutput::start(const BMDDisplayMode mode, const int audio_channels, 
     return false;
   }
 
+  has_audio = audio_channels > 0;
+
   auto res = output->GetDisplayMode(mode, &display_mode);
   if (res != S_OK) {
     return false;
@@ -57,6 +60,20 @@ bool DecklinkOutput::start(const BMDDisplayMode mode, const int audio_channels, 
     return false;
   }
 
+  width = display_mode->GetWidth();
+  height = display_mode->GetHeight();
+
+	IDeckLinkKeyer *keyer = nullptr;
+  res = output->QueryInterface(IID_IDeckLinkKeyer, (void**)&keyer);
+	if (res == S_OK) {
+		if (rgba_mode) {
+			keyer->Enable(true);
+			keyer->SetLevel(255);
+		} else {
+			keyer->Disable();
+		}
+	}  
+
   if (rgba_mode) {
     pixel_format = bmdFormat8BitBGRA;
     row_bytes = width * 4;
@@ -65,32 +82,47 @@ bool DecklinkOutput::start(const BMDDisplayMode mode, const int audio_channels, 
     row_bytes = width * 2;
   }
 
-  width = display_mode->GetWidth();
-  height = display_mode->GetHeight();
-
   res = output->EnableVideoOutput(mode, bmdVideoOutputFlagDefault);
   if (res != S_OK) {
     return false;
   }
 
-  res = output->EnableAudioOutput(bmdAudioSampleRate48kHz, bmdAudioSampleType16bitInteger, audio_channels, bmdAudioOutputStreamTimestamped);
-  if (res != S_OK) {
-    return false;
+  output->SetScheduledFrameCompletionCallback(this);
+
+  if (has_audio) {
+    res = output->EnableAudioOutput(bmdAudioSampleRate48kHz, bmdAudioSampleType16bitInteger, audio_channels, bmdAudioOutputStreamTimestamped);
+    if (res != S_OK) {
+      return false;
+    }
+
+    output->SetAudioCallback(this);
+    output->BeginAudioPreroll();
   }
 
-  output->SetScheduledFrameCompletionCallback(this);
-	output->SetAudioCallback(this);
-	output->BeginAudioPreroll();
-
+  started = true;
   return true;
 }
 
 void DecklinkOutput::stop() {
-  started = false;
-
   if (output != nullptr) {
+    display_mode->Release();
+    display_mode = nullptr;
+
+    if (playing) {
+      output->StopScheduledPlayback(0, nullptr, DECKLINK_TIME_BASE);
+    }
+  
     output->DisableVideoOutput();
+    if (has_audio) {
+      output->DisableAudioOutput();
+    }
+
+    output->SetScheduledFrameCompletionCallback(nullptr);
+    output->SetAudioCallback(nullptr);
   }
+
+  started = false;
+  playing = false;
 }
 
 bool DecklinkOutput::start_scheduled_playback() {
@@ -103,7 +135,7 @@ bool DecklinkOutput::start_scheduled_playback() {
     return false;
   }
 
-  started = true;
+  playing = true;
 
   return true;
 }

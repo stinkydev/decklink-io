@@ -21,5 +21,6 @@ namespace sesame_decklink {
 
     extern DECKLINK_IO_API DecklinkInput* get_input_device(const int device_index, IDeckLinkMemoryAllocator* allocator, const int64_t group = 0);
     extern DECKLINK_IO_API DecklinkOutput* get_output_device(const int device_index, IDeckLinkMemoryAllocator* allocator);
+    extern DECKLINK_IO_API void release_output_device(DecklinkOutput* output);
   }
 }

@@ -64,6 +64,14 @@ DecklinkOutput* get_output_device(const int device_index, IDeckLinkMemoryAllocat
   }
 }
 
+void release_output_device(DecklinkOutput* output) {
+  if (mgr == nullptr) {
+    return;
+  }
+
+  mgr->release_output_device(output);
+}
+
 
 }  // namespace api
 }  // namespace sesame_decklink

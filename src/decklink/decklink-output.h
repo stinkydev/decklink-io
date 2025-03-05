@@ -19,6 +19,9 @@ class DecklinkOutput : public IDeckLinkVideoOutputCallback, public IDeckLinkAudi
   std::atomic<long> ref_count = 1;
 
   bool started = false;
+  bool playing = false;
+
+  bool has_audio = false;
   
   BMDTimeScale time_scale = 0;
   BMDTimeValue frame_duration = 0;

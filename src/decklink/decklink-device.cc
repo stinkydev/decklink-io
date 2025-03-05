@@ -15,6 +15,8 @@ DecklinkDevice::DecklinkDevice(IDeckLink* device, const int index) {
     status = nullptr;
   }
   this->info.index = index;
+
+  initialize();
 }
 
 DecklinkDevice::~DecklinkDevice() {

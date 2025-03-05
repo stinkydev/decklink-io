@@ -15,6 +15,8 @@ void DeviceManager::refresh_devices() {
 }
 
 void DeviceManager::initialize_devices() {
+  std::lock_guard<std::mutex> lock(device_mutex);
+
   for (auto &dev : devices) {
     dev->initialize();
     update_peers_for_device(dev.get());
@@ -35,6 +37,8 @@ void DeviceManager::update_peers_for_device(DecklinkDevice* device) {
 }
 
 std::vector<DecklinkDeviceInfo> DeviceManager::get_devices() {
+  std::lock_guard<std::mutex> lock(device_mutex);
+
   std::vector<DecklinkDeviceInfo> result;
   for (auto &dev : devices) {
     const auto info = dev->get_info();
@@ -44,6 +48,8 @@ std::vector<DecklinkDeviceInfo> DeviceManager::get_devices() {
 }
 
 DecklinkInput* DeviceManager::get_input_device(const int device_index, IDeckLinkMemoryAllocator* allocator, const int64_t group) {
+  std::lock_guard<std::mutex> lock(device_mutex);
+
   if (device_index < 0 || device_index >= devices.size()) {
     return nullptr;
   }
@@ -52,11 +58,19 @@ DecklinkInput* DeviceManager::get_input_device(const int device_index, IDeckLink
 }
 
 DecklinkOutput* DeviceManager::get_output_device(const int device_index, IDeckLinkMemoryAllocator* allocator) {
+  std::lock_guard<std::mutex> lock(device_mutex);
+
   if (device_index < 0 || device_index >= devices.size()) {
     return nullptr;
   }
 
   return new DecklinkOutput(devices[device_index].get(), allocator);
+}
+
+void DeviceManager::release_output_device(DecklinkOutput* output) {
+  std::lock_guard<std::mutex> lock(device_mutex);
+
+  delete output;
 }
 
 bool DeviceManager::set_device_profile(const int device_index, const BMDProfileID profile_id) {
