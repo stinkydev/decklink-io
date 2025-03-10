@@ -4,6 +4,8 @@
 
 namespace sesame_decklink {
 
+constexpr unsigned int DECKLINK_AUDIO_CHANNELS = 16;
+
 bool DecklinkInput::get_hardware_time(BMDTimeValue* time) {
   BMDTimeValue hardware_time;
   BMDTimeValue time_in_frame;
@@ -73,12 +75,14 @@ bool DecklinkInput::handle_audio(IDeckLinkAudioInputPacket* packet) {
     audio.data = nullptr;
     audio.timestamp = 0;
     audio.frames = 0;
+    audio.channels = 0;
     return false;
   }
 
   audio.timestamp = (uint64_t)timestamp;
   audio.frames = packet->GetSampleFrameCount();
   audio.data = reinterpret_cast<uint8_t*>(data);
+  audio.channels = DECKLINK_AUDIO_CHANNELS;
   return true;
 }
 
@@ -158,7 +162,7 @@ bool DecklinkInput::start(const BMDDisplayMode mode) {
     return false;
   }
 
-  res = input->EnableAudioInput(bmdAudioSampleRate48kHz, bmdAudioSampleType16bitInteger, 16);
+  res = input->EnableAudioInput(bmdAudioSampleRate48kHz, bmdAudioSampleType16bitInteger, DECKLINK_AUDIO_CHANNELS);
   if (res != S_OK) {
     return false;
   }

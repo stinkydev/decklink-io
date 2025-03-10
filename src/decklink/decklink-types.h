@@ -20,6 +20,7 @@ struct DecklinkAudioPacket {
   uint32_t frames;
   uint64_t timestamp;
   uint8_t* data;
+  uint32_t channels;
 };
 
 enum DecklinkEventType {
