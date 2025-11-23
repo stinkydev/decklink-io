@@ -24,8 +24,8 @@ target_sources(
 target_sources(
   decklink
   PRIVATE
-  $<$<PLATFORM_ID:Darwin>:mac/platform.cpp>
-  $<$<PLATFORM_ID:Linux,FreeBSD,OpenBSD>:linux/platform.cpp>
+  $<$<PLATFORM_ID:Darwin>:mac/platform.cc>
+  $<$<PLATFORM_ID:Linux,FreeBSD,OpenBSD>:linux/platform.cc>
   $<$<PLATFORM_ID:Windows>:win/platform.cc>
   decklink/api.cc
   decklink/decklink-device-mgr.cc
