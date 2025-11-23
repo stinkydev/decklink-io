@@ -52,3 +52,17 @@ bool decklink_string_to_std_string(decklink_string_t input, std::string &output)
 
 	return true;
 }
+
+bool decklink_platform_init(void) {
+	HRESULT result = CoInitialize(nullptr);
+	return SUCCEEDED(result);
+}
+
+void decklink_platform_deinit(void) {
+	CoUninitialize();
+}
+
+void decklink_free_string(decklink_string_t input) {
+	if (input != nullptr)
+		SysFreeString(input);
+}

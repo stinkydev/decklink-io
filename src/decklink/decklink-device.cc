@@ -30,15 +30,15 @@ DecklinkDevice::~DecklinkDevice() {
 }
 
 void DecklinkDevice::initialize() {
-  BSTR name;
+  decklink_string_t name;
   device->GetDisplayName(&name);
   decklink_string_to_std_string(name, info.displayName);
-  SysFreeString(name);
+  decklink_free_string(name);
 
-  BSTR model;
+  decklink_string_t model;
   device->GetModelName(&model);
   decklink_string_to_std_string(model, info.model);
-  SysFreeString(model);
+  decklink_free_string(model);
 
   IDeckLinkProfileAttributes *profileAttributes;
   auto res = device->QueryInterface(IID_IDeckLinkProfileAttributes, (void**)&profileAttributes);
@@ -66,19 +66,21 @@ void DecklinkDevice::initialize() {
     profileAttributes->Release();
   }
 
-  ComPtr<IDeckLinkInput> input;
+  IDeckLinkInput* input = nullptr;
 	if (device->QueryInterface(IID_IDeckLinkInput, (void **)&input) == S_OK) {
-		ComPtr<IDeckLinkDisplayModeIterator> iterator;
+		IDeckLinkDisplayModeIterator* iterator = nullptr;
 		if (input->GetDisplayModeIterator(&iterator) == S_OK) {
-			ComPtr<IDeckLinkDisplayMode> display_mode;
+			IDeckLinkDisplayMode* display_mode = nullptr;
 
 			while (iterator->Next(&display_mode) == S_OK) {
 				if (display_mode == nullptr)
 					continue;
 
-				input_modes.push_back(display_mode.Get());
+				input_modes.push_back(display_mode);
 			}
+			iterator->Release();
 		}
+		input->Release();
 	}
 }
 
@@ -165,7 +167,7 @@ std::vector<std::string> DecklinkDevice::get_peer_devices() {
       dev->GetDisplayName(&name);
       std::string peer_name;
       decklink_string_to_std_string(name, peer_name);
-      SysFreeString(name);
+      decklink_free_string(name);
 
       result.push_back(peer_name);
       dev->Release();

@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Windows.h>
+#include "platform.h"
 #include <string>
 #include <vector>
 #include <memory>

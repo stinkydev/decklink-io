@@ -1,5 +1,6 @@
 #include "decklink-device.h"
 #include "decklink-output.h"
+#include <stdexcept>
 
 namespace sesame_decklink {
 
@@ -7,7 +8,7 @@ DecklinkOutput::DecklinkOutput(DecklinkDevice* device, IDeckLinkMemoryAllocator*
   const auto dev = device->get_device();
   if (dev->QueryInterface(IID_IDeckLinkOutput, (void**)&output) != S_OK) {
     output = nullptr;
-    throw std::exception("Failed to get output interface for decklink device");
+    throw std::runtime_error("Failed to get output interface for decklink device");
   }
 
   if (allocator != nullptr) {

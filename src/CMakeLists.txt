@@ -4,6 +4,13 @@ cmake_minimum_required(VERSION 3.28)
 add_library(decklink-sdk INTERFACE)
 add_library(Decklink::SDK ALIAS decklink-sdk)
 
+target_include_directories(
+  decklink-sdk
+  INTERFACE
+    $<$<PLATFORM_ID:Linux,FreeBSD,OpenBSD>:${CMAKE_CURRENT_SOURCE_DIR}/linux/decklink-sdk>
+    $<$<PLATFORM_ID:Windows>:${CMAKE_CURRENT_SOURCE_DIR}/win/decklink-sdk>
+)
+
 add_library (decklink STATIC)
 
 target_sources(

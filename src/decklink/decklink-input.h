@@ -28,7 +28,7 @@ private:
   DecklinkVideoFrame video;
   DecklinkAudioPacket audio;
 
-  volatile long ref_count = 1;
+  std::atomic<long> ref_count{1};
 
   bool handle_audio(IDeckLinkAudioInputPacket* packet);
   bool handle_video(IDeckLinkVideoInputFrame* frame);

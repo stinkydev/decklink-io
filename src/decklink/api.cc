@@ -17,7 +17,7 @@ bool set_paired_connectors(const int device_index, const bool enable) {
 }
 
 bool initialize() {
-  CoInitialize(nullptr);
+  decklink_platform_init();
   mgr = new DeviceManager();
   mgr->refresh_devices();
 
@@ -27,7 +27,7 @@ bool initialize() {
 bool deinitialize() {
   delete mgr;
 
-  CoUninitialize();
+  decklink_platform_deinit();
 
   return true;
 }

@@ -1,4 +1,8 @@
 #include "decklink-input.h"
+#include "platform.h"
+#include <cstring>
+#include <stdexcept>
+#include <atomic>
 
 #include <iostream>
 
@@ -26,11 +30,15 @@ bool DecklinkInput::get_hardware_time(BMDTimeValue* time) {
 }
 
 ULONG STDMETHODCALLTYPE DecklinkInput::AddRef() {
-  return InterlockedIncrement(&ref_count);
+  return ++ref_count;
 }
 
 HRESULT STDMETHODCALLTYPE DecklinkInput::QueryInterface(REFIID iid, LPVOID* ppv) {
+#if defined(_WIN32)
   if (iid == IID_IUnknown || iid == IID_IDeckLinkInputCallback) {
+#else
+  if (refiid_equal(iid, IID_IUnknown) || refiid_equal(iid, IID_IDeckLinkInputCallback)) {
+#endif
     *ppv = this;
     AddRef();
     return S_OK;
@@ -46,7 +54,7 @@ HRESULT STDMETHODCALLTYPE DecklinkInput::QueryInterface(REFIID iid, LPVOID* ppv)
 }
 
 ULONG STDMETHODCALLTYPE DecklinkInput::Release() {
-  auto new_ref_count = InterlockedDecrement(&ref_count);
+  auto new_ref_count = --ref_count;
   if (new_ref_count == 0) {
     delete this;
     return 0;
@@ -199,16 +207,16 @@ DecklinkInput::DecklinkInput(DecklinkDevice* device, IDeckLinkMemoryAllocator* a
   IDeckLinkConfiguration* config = nullptr;
   if (dev->QueryInterface(IID_IDeckLinkConfiguration, (void**)&config) != S_OK) {
     config = nullptr;
-    throw std::exception("Failed to get configuration interface for decklink device");
+    throw std::runtime_error("Failed to get configuration interface for decklink device");
   }
 
   if (config->SetInt(bmdDeckLinkConfigCaptureGroup, group) != S_OK) {
-    throw std::exception("Failed to set capture group for decklink device");
+    throw std::runtime_error("Failed to set capture group for decklink device");
   }
 
   if (dev->QueryInterface(IID_IDeckLinkInput, (void**)&input) != S_OK) {
     input = nullptr;
-    throw std::exception("Failed to get input interface for decklink device");
+    throw std::runtime_error("Failed to get input interface for decklink device");
   }
 
   if (allocator != nullptr) {
