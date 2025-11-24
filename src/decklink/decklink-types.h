@@ -2,7 +2,7 @@
 
 #include <functional>
 #include <cstdint>
-#include <DeckLinkAPI.h>
+#include "platform.h"
 
 #define DECKLINK_TIME_BASE 1000000000
 

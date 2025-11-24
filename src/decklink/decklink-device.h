@@ -2,7 +2,7 @@
 
 #include <string>
 #include <vector>
-#include <DeckLinkAPI.h>
+#include "platform.h"
 
 struct IDeckLink;
 

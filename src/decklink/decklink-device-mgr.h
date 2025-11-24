@@ -6,7 +6,7 @@
 
 #include <memory>
 #include <vector>
-#include <DeckLinkAPI.h>
+#include "platform.h"
 #include <mutex>
 
 namespace sesame_decklink {

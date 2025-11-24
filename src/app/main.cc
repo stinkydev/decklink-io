@@ -56,7 +56,7 @@ int main() {
     }
   });
 
-  if (input->start(BMDDisplayMode::bmdModeHD1080i50)) {
+  if (input->start(bmdModeHD1080i50)) {
     std::cout << "Press any key to stop" << std::endl;
     std::cin.get();
     input->stop();
