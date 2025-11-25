@@ -78,9 +78,14 @@ static void	InitDeckLinkAPI (void)
 	gCreateDeckLinkDiscoveryFunc = (CreateDeckLinkDiscoveryInstanceFunc)dlsym(libraryHandle, "CreateDeckLinkDiscoveryInstance_0003");
 	if (!gCreateDeckLinkDiscoveryFunc)
 		fprintf(stderr, "%s\n", dlerror());
-	gCreateVideoFrameAncillaryPacketsFunc = (CreateVideoFrameAncillaryPacketsInstanceFunc)dlsym(libraryHandle, "CreateVideoFrameAncillaryPacketsInstance_0001");
+	gCreateVideoFrameAncillaryPacketsFunc = (CreateVideoFrameAncillaryPacketsInstanceFunc)dlsym(libraryHandle, "CreateVideoFrameAncillaryPacketsInstance_0002");
 	if (!gCreateVideoFrameAncillaryPacketsFunc)
-		fprintf(stderr, "%s\n", dlerror());
+	{
+		// Fall back to older version if newer not available
+		gCreateVideoFrameAncillaryPacketsFunc = (CreateVideoFrameAncillaryPacketsInstanceFunc)dlsym(libraryHandle, "CreateVideoFrameAncillaryPacketsInstance_0001");
+		if (!gCreateVideoFrameAncillaryPacketsFunc)
+			fprintf(stderr, "%s\n", dlerror());
+	}
 }
 
 static void	InitDeckLinkPreviewAPI (void)
