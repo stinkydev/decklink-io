@@ -1,12 +1,13 @@
 #include "api.h"
 
+#include <memory>
 #include "decklink-device-mgr.h"
 
 // ----------------------------------------------------------------------------
 namespace sesame_decklink {
 namespace api {
 
-static DeviceManager * mgr = nullptr;
+static std::unique_ptr<DeviceManager> mgr;
 
 bool set_paired_connectors(const int device_index, const bool enable) {
   if (mgr == nullptr) {
@@ -18,14 +19,14 @@ bool set_paired_connectors(const int device_index, const bool enable) {
 
 bool initialize() {
   decklink_platform_init();
-  mgr = new DeviceManager();
+  mgr = std::make_unique<DeviceManager>();
   mgr->refresh_devices();
 
   return true;
 }
 
 bool deinitialize() {
-  delete mgr;
+  mgr.reset();
 
   decklink_platform_deinit();
 
