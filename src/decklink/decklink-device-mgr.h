@@ -6,6 +6,7 @@
 
 #include <memory>
 #include <vector>
+#include <set>
 #include "platform.h"
 #include <mutex>
 
@@ -17,6 +18,7 @@ namespace sesame_decklink {
    private:
     std::mutex device_mutex; 
     std::vector<std::unique_ptr<DecklinkDevice>> devices;
+    std::set<int> acquired_devices;
     DecklinkDeviceEnumerator enumerator;
     void initialize_devices();
     void update_peers_for_device(DecklinkDevice* device);
@@ -25,8 +27,9 @@ namespace sesame_decklink {
     std::vector<DecklinkDeviceInfo> get_devices();
 
     DecklinkInput* get_input_device(const int device_index, IDeckLinkMemoryAllocator* allocator, const int64_t group = 0);
+    void release_input_device(const int device_index);
     DecklinkOutput* get_output_device(const int device_index, IDeckLinkMemoryAllocator* allocator);
-    void release_output_device(DecklinkOutput* output);
+    void release_output_device(DecklinkOutput* output, const int device_index);
 
     bool set_device_profile(const int device_index, const BMDProfileID profile_id);
 

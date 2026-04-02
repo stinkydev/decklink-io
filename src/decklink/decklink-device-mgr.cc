@@ -54,7 +54,18 @@ DecklinkInput* DeviceManager::get_input_device(const int device_index, IDeckLink
     return nullptr;
   }
 
-  return new DecklinkInput(devices[device_index].get(), allocator, group);
+  if (acquired_devices.count(device_index)) {
+    return nullptr;
+  }
+
+  auto* input = new DecklinkInput(devices[device_index].get(), allocator, group);
+  acquired_devices.insert(device_index);
+  return input;
+}
+
+void DeviceManager::release_input_device(const int device_index) {
+  std::lock_guard<std::mutex> lock(device_mutex);
+  acquired_devices.erase(device_index);
 }
 
 DecklinkOutput* DeviceManager::get_output_device(const int device_index, IDeckLinkMemoryAllocator* allocator) {
@@ -64,12 +75,19 @@ DecklinkOutput* DeviceManager::get_output_device(const int device_index, IDeckLi
     return nullptr;
   }
 
-  return new DecklinkOutput(devices[device_index].get(), allocator);
+  if (acquired_devices.count(device_index)) {
+    return nullptr;
+  }
+
+  auto* output = new DecklinkOutput(devices[device_index].get(), allocator);
+  acquired_devices.insert(device_index);
+  return output;
 }
 
-void DeviceManager::release_output_device(DecklinkOutput* output) {
+void DeviceManager::release_output_device(DecklinkOutput* output, const int device_index) {
   std::lock_guard<std::mutex> lock(device_mutex);
 
+  acquired_devices.erase(device_index);
   delete output;
 }
 

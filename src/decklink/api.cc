@@ -53,6 +53,14 @@ DecklinkInput* get_input_device(const int device_index, IDeckLinkMemoryAllocator
   }
 }
 
+void release_input_device(const int device_index) {
+  if (mgr == nullptr) {
+    return;
+  }
+
+  mgr->release_input_device(device_index);
+}
+
 DecklinkOutput* get_output_device(const int device_index, IDeckLinkMemoryAllocator* allocator) {
   if (mgr == nullptr) {
     return nullptr;
@@ -65,12 +73,12 @@ DecklinkOutput* get_output_device(const int device_index, IDeckLinkMemoryAllocat
   }
 }
 
-void release_output_device(DecklinkOutput* output) {
+void release_output_device(DecklinkOutput* output, const int device_index) {
   if (mgr == nullptr) {
     return;
   }
 
-  mgr->release_output_device(output);
+  mgr->release_output_device(output, device_index);
 }
 
 
