@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.15)
 
 # Only generate Debug and Release configuration types.
-set(CMAKE_CONFIGURATION_TYPES Debug Release)
+set(CMAKE_CONFIGURATION_TYPES Debug Release RelWithDebInfo)
 cmake_policy(SET CMP0048 NEW)
 
 set(CMAKE_CXX_STANDARD 17)
