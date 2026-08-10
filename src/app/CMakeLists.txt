@@ -8,3 +8,6 @@ include_directories()
 #indicate the entry point for the library
 add_executable(decklink-io-app ${APP_SRCS})
 target_link_libraries(decklink-io-app decklink)
+
+add_executable(decklink-cli decklink-cli.cc)
+target_link_libraries(decklink-cli decklink)
