@@ -87,9 +87,40 @@ struct DeviceEntry {
   int64_t active_profile = 0;
   bool capture = false;
   bool playback = false;
+  bool signal_locked = false;
+  bool in_use = false;
+  std::string input_mode;
   std::vector<int64_t> available_profiles;
   IDeckLink* device = nullptr;
 };
+
+std::string display_mode_name(IDeckLink* device, const int64_t mode) {
+  std::string name = fourcc_to_string(mode);
+  IDeckLinkInput* input = nullptr;
+  if (device->QueryInterface(IID_IDeckLinkInput, (void**)&input) != S_OK) {
+    return name;
+  }
+
+  IDeckLinkDisplayModeIterator* iterator = nullptr;
+  if (input->GetDisplayModeIterator(&iterator) == S_OK) {
+    IDeckLinkDisplayMode* display_mode = nullptr;
+    while (iterator->Next(&display_mode) == S_OK) {
+      if (display_mode->GetDisplayMode() == (BMDDisplayMode)mode) {
+        decklink_string_t mode_name;
+        if (display_mode->GetName(&mode_name) == S_OK) {
+          decklink_string_to_std_string(mode_name, name);
+          decklink_free_string(mode_name);
+        }
+        display_mode->Release();
+        break;
+      }
+      display_mode->Release();
+    }
+    iterator->Release();
+  }
+  input->Release();
+  return name;
+}
 
 int64_t get_profile_id(IDeckLinkProfile* profile) {
   IDeckLinkProfileAttributes* attributes = nullptr;
@@ -173,6 +204,71 @@ std::vector<DeviceEntry> enumerate_devices() {
   return entries;
 }
 
+void read_signal_status(DeviceEntry& entry) {
+  IDeckLinkStatus* status = nullptr;
+  if (entry.device->QueryInterface(IID_IDeckLinkStatus, (void**)&status) != S_OK) {
+    return;
+  }
+
+  decklink_bool_t locked = false;
+  if (status->GetFlag(bmdDeckLinkStatusVideoInputSignalLocked, &locked) == S_OK && locked) {
+    entry.signal_locked = true;
+    int64_t detected_mode = 0;
+    if (status->GetInt(bmdDeckLinkStatusDetectedVideoInputMode, &detected_mode) == S_OK && detected_mode != 0) {
+      entry.input_mode = display_mode_name(entry.device, detected_mode);
+    }
+  }
+  status->Release();
+}
+
+// The driver only reports input signal lock while the input is enabled, so
+// briefly start capture with format detection on every idle input, read the
+// status, and stop again. Inputs owned by another application refuse to
+// enable; their running capture keeps the status flag valid, so read it as-is.
+void probe_signals(std::vector<DeviceEntry>& entries) {
+  struct Probe {
+    IDeckLinkInput* input;
+    DeviceEntry* entry;
+  };
+  std::vector<Probe> probes;
+
+  for (auto& entry : entries) {
+    if (!entry.capture || entry.duplex == bmdDuplexInactive) continue;
+
+    IDeckLinkInput* input = nullptr;
+    if (entry.device->QueryInterface(IID_IDeckLinkInput, (void**)&input) != S_OK) {
+      continue;
+    }
+    if (input->EnableVideoInput(bmdModeHD1080i50, bmdFormat8BitYUV, bmdVideoInputEnableFormatDetection) != S_OK ||
+        input->StartStreams() != S_OK) {
+      read_signal_status(entry);
+      entry.in_use = true;
+      input->Release();
+      continue;
+    }
+    probes.push_back({input, &entry});
+  }
+
+  const auto start = std::chrono::steady_clock::now();
+  while (std::chrono::steady_clock::now() - start < std::chrono::milliseconds(2500)) {
+    bool all_locked = true;
+    for (auto& probe : probes) {
+      if (!probe.entry->signal_locked) {
+        read_signal_status(*probe.entry);
+        if (!probe.entry->signal_locked) all_locked = false;
+      }
+    }
+    if (all_locked) break;
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+  }
+
+  for (auto& probe : probes) {
+    probe.input->StopStreams();
+    probe.input->DisableVideoInput();
+    probe.input->Release();
+  }
+}
+
 void release_devices(std::vector<DeviceEntry>& entries) {
   for (auto& entry : entries) {
     if (entry.device != nullptr) {
@@ -212,6 +308,13 @@ void print_json(const std::vector<DeviceEntry>& entries) {
     printf("    \"duplex\": \"%s\",\n", duplex_to_string(e.duplex).c_str());
     printf("    \"capture\": %s,\n", e.capture ? "true" : "false");
     printf("    \"playback\": %s,\n", e.playback ? "true" : "false");
+    printf("    \"input_signal\": %s,\n", e.signal_locked ? "true" : "false");
+    printf("    \"input_in_use\": %s,\n", e.in_use ? "true" : "false");
+    if (e.input_mode.empty()) {
+      printf("    \"input_mode\": null,\n");
+    } else {
+      printf("    \"input_mode\": \"%s\",\n", json_escape(e.input_mode).c_str());
+    }
     printf("    \"active_profile\": \"%s\",\n", profile_to_name(e.active_profile).c_str());
     printf("    \"available_profiles\": [");
     for (size_t j = 0; j < e.available_profiles.size(); j++) {
@@ -229,8 +332,8 @@ void print_table(const std::vector<DeviceEntry>& entries) {
     return;
   }
 
-  printf("%-4s %-28s %-24s %-12s %-6s %-9s %-4s %-8s %s\n",
-         "Idx", "Name", "Model", "PersistentID", "Sub", "Duplex", "I/O", "Profile", "Available");
+  printf("%-4s %-28s %-24s %-12s %-6s %-9s %-6s %-8s %-18s %s\n",
+         "Idx", "Name", "Model", "PersistentID", "Sub", "Duplex", "I/O", "Profile", "Signal", "Available");
   for (const auto& e : entries) {
     std::string io;
     if (e.capture) io += "in";
@@ -247,7 +350,13 @@ void print_table(const std::vector<DeviceEntry>& entries) {
     }
     if (available.empty()) available = "-";
 
-    printf("%-4d %-28s %-24s 0x%-10llx %-6s %-9s %-4s %-8s %s\n",
+    std::string signal = "-";
+    if (e.capture && e.duplex != bmdDuplexInactive) {
+      signal = e.signal_locked ? (e.input_mode.empty() ? "locked" : e.input_mode) : "none";
+      if (e.in_use) signal += " (in use)";
+    }
+
+    printf("%-4d %-28s %-24s 0x%-10llx %-6s %-9s %-6s %-8s %-18s %s\n",
            e.index,
            e.display_name.c_str(),
            e.model.c_str(),
@@ -256,6 +365,7 @@ void print_table(const std::vector<DeviceEntry>& entries) {
            duplex_to_string(e.duplex).c_str(),
            io.c_str(),
            profile_to_name(e.active_profile).c_str(),
+           signal.c_str(),
            available.c_str());
   }
 }
@@ -476,6 +586,7 @@ int main(int argc, char** argv) {
 
   int result = 1;
   if (command == "list") {
+    probe_signals(entries);
     if (json) {
       print_json(entries);
     } else {
