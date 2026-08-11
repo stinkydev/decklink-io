@@ -106,8 +106,11 @@ bool DecklinkOutput::start(const BMDDisplayMode mode, const int audio_channels, 
 
 void DecklinkOutput::stop() {
   if (output != nullptr) {
-    display_mode->Release();
-    display_mode = nullptr;
+    // Null when start() never reached GetDisplayMode.
+    if (display_mode != nullptr) {
+      display_mode->Release();
+      display_mode = nullptr;
+    }
 
     if (playing) {
       output->StopScheduledPlayback(0, nullptr, DECKLINK_TIME_BASE);
