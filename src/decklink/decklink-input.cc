@@ -167,16 +167,19 @@ bool DecklinkInput::start(const BMDDisplayMode mode) {
 
   res = input->EnableVideoInput(mode, bmdFormat8BitYUV, flags);
   if (res != S_OK) {
+    abort_failed_start();
     return false;
   }
 
   res = input->EnableAudioInput(bmdAudioSampleRate48kHz, bmdAudioSampleType16bitInteger, DECKLINK_AUDIO_CHANNELS);
   if (res != S_OK) {
+    abort_failed_start();
     return false;
   }
 
   res = input->StartStreams();
   if (res != S_OK) {
+    abort_failed_start();
     return false;
   }
 
@@ -185,14 +188,15 @@ bool DecklinkInput::start(const BMDDisplayMode mode) {
   return true;
 }
 
+void DecklinkInput::abort_failed_start() {
+  unsubscribe_notification();
+  input->SetCallback(nullptr);
+}
+
 void DecklinkInput::stop() {
   started = false;
 
-  if (notification != nullptr) {
-		notification->Unsubscribe(bmdStatusChanged, this);
-		notification->Release();
-		notification = nullptr;
-	}
+  unsubscribe_notification();
 
   auto res = input->StopStreams();
   if (res != S_OK) {

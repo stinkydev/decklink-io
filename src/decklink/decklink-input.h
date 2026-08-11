@@ -18,6 +18,16 @@ private:
   IDeckLinkNotification* notification = nullptr;
   IDeckLinkMemoryAllocator* allocator = nullptr;
 
+  void unsubscribe_notification() {
+    if (notification != nullptr) {
+      notification->Unsubscribe(bmdStatusChanged, this);
+      notification->Release();
+      notification = nullptr;
+    }
+  }
+
+  void abort_failed_start();
+
   int64_t capture_group = 0;
   bool started = false;
 
@@ -67,11 +77,12 @@ private:
 
   DecklinkInput(DecklinkDevice* device, IDeckLinkMemoryAllocator* allocator,  const int64_t group = 0);
   ~DecklinkInput() {
-    device = nullptr;
     if (input != nullptr) {
       input->SetCallback(nullptr);
       if (started) {
         stop();
+      } else {
+        unsubscribe_notification();
       }
       input->SetVideoInputFrameMemoryAllocator(nullptr);
       input->DisableAudioInput();
@@ -79,6 +90,9 @@ private:
       input->Release();
       input = nullptr;
     }
+    // Nulled only after the notification subscription is gone; Notify()
+    // dereferences device.
+    device = nullptr;
   };
 
   ULONG STDMETHODCALLTYPE AddRef(void);
