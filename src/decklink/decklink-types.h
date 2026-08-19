@@ -14,6 +14,12 @@ struct DecklinkVideoFrame {
   uint64_t timestamp;
   uint64_t hardware_time;
   bool interlaced;
+  bool timecode_valid;
+  uint8_t tc_hours;
+  uint8_t tc_minutes;
+  uint8_t tc_seconds;
+  uint8_t tc_frames;
+  bool tc_drop_frame;
 };
 
 struct DecklinkAudioPacket {
@@ -21,6 +27,15 @@ struct DecklinkAudioPacket {
   uint64_t timestamp;
   uint8_t* data;
   uint32_t channels;
+};
+
+struct DecklinkTimecode {
+  bool valid;
+  uint8_t hours;
+  uint8_t minutes;
+  uint8_t seconds;
+  uint8_t frames;
+  bool drop_frame;
 };
 
 enum DecklinkEventType {

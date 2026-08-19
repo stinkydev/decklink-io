@@ -126,6 +126,21 @@ bool DecklinkInput::handle_video(IDeckLinkVideoInputFrame* frame) {
   } else {
     video.hardware_time = 0;
   }
+
+  video.timecode_valid = false;
+  IDeckLinkTimecode* timecode = nullptr;
+  if (frame->GetTimecode(bmdTimecodeRP188Any, &timecode) == S_OK && timecode != nullptr) {
+    uint8_t hours, minutes, seconds, frames;
+    if (timecode->GetComponents(&hours, &minutes, &seconds, &frames) == S_OK) {
+      video.tc_hours = hours;
+      video.tc_minutes = minutes;
+      video.tc_seconds = seconds;
+      video.tc_frames = frames;
+      video.tc_drop_frame = (timecode->GetFlags() & bmdTimecodeIsDropFrame) != 0;
+      video.timecode_valid = true;
+    }
+    timecode->Release();
+  }
   return true;
 }
 
