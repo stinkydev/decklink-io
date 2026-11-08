@@ -74,7 +74,8 @@ bool DecklinkOutput::start(const BMDDisplayMode mode, const int audio_channels, 
 		} else {
 			keyer->Disable();
 		}
-	}  
+		keyer->Release();
+	}
 
   if (rgba_mode) {
     pixel_format = bmdFormat8BitBGRA;
@@ -230,6 +231,7 @@ HRESULT	STDMETHODCALLTYPE DecklinkOutput::RenderAudioSamples(decklink_bool_t pre
 }
 
 HRESULT STDMETHODCALLTYPE DecklinkOutput::QueryInterface(REFIID iid, LPVOID* ppv) {
+  *ppv = nullptr;
   return E_NOINTERFACE;
 }
 

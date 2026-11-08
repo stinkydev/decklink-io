@@ -30,58 +30,39 @@ DecklinkDevice::~DecklinkDevice() {
 }
 
 void DecklinkDevice::initialize() {
-  decklink_string_t name;
-  device->GetDisplayName(&name);
-  decklink_string_to_std_string(name, info.displayName);
-  decklink_free_string(name);
+  decklink_string_t name = nullptr;
+  if (device->GetDisplayName(&name) == S_OK) {
+    decklink_string_to_std_string(name, info.displayName);
+    decklink_free_string(name);
+  }
 
-  decklink_string_t model;
-  device->GetModelName(&model);
-  decklink_string_to_std_string(model, info.model);
-  decklink_free_string(model);
+  decklink_string_t model = nullptr;
+  if (device->GetModelName(&model) == S_OK) {
+    decklink_string_to_std_string(model, info.model);
+    decklink_free_string(model);
+  }
 
   IDeckLinkProfileAttributes *profileAttributes;
   auto res = device->QueryInterface(IID_IDeckLinkProfileAttributes, (void**)&profileAttributes);
   if (res == S_OK) {
-    int64_t value;
-    profileAttributes->GetInt(BMDDeckLinkProfileID, &value);
-    info.profile_id = static_cast<int>(value);
+    // An attribute the card does not report reads as 0.
+    const auto get_int = [profileAttributes](BMDDeckLinkAttributeID id) {
+      int64_t value = 0;
+      return profileAttributes->GetInt(id, &value) == S_OK ? value : 0;
+    };
 
-    profileAttributes->GetInt(BMDDeckLinkSubDeviceIndex, &value);
-    info.device_id = static_cast<int>(value >> 32);
+    info.profile_id = static_cast<int>(get_int(BMDDeckLinkProfileID));
+    info.device_id = static_cast<int>(get_int(BMDDeckLinkSubDeviceIndex) >> 32);
+    info.max_audio_channels = static_cast<int>(get_int(BMDDeckLinkMaximumAudioChannels));
+    info.sub_devices = static_cast<int>(get_int(BMDDeckLinkNumberOfSubDevices));
+    info.sub_device_index = static_cast<int>(get_int(BMDDeckLinkSubDeviceIndex));
 
-    profileAttributes->GetInt(BMDDeckLinkMaximumAudioChannels, &value);
-    info.max_audio_channels = static_cast<int>(value);
-
-    profileAttributes->GetInt(BMDDeckLinkNumberOfSubDevices, &value);
-    info.sub_devices = static_cast<int>(value);
-
-    profileAttributes->GetInt(BMDDeckLinkSubDeviceIndex, &value);
-    info.sub_device_index = static_cast<int>(value);
-
-    decklink_bool_t flag;
-    profileAttributes->GetFlag(BMDDeckLinkSupportsExternalKeying, &flag);
-    info.supports_external_keying = flag;
+    decklink_bool_t flag = false;
+    info.supports_external_keying =
+        profileAttributes->GetFlag(BMDDeckLinkSupportsExternalKeying, &flag) == S_OK && flag;
 
     profileAttributes->Release();
   }
-
-  IDeckLinkInput* input = nullptr;
-	if (device->QueryInterface(IID_IDeckLinkInput, (void **)&input) == S_OK) {
-		IDeckLinkDisplayModeIterator* iterator = nullptr;
-		if (input->GetDisplayModeIterator(&iterator) == S_OK) {
-			IDeckLinkDisplayMode* display_mode = nullptr;
-
-			while (iterator->Next(&display_mode) == S_OK) {
-				if (display_mode == nullptr)
-					continue;
-
-				input_modes.push_back(display_mode);
-			}
-			iterator->Release();
-		}
-		input->Release();
-	}
 }
 
 DecklinkDeviceInfo DecklinkDevice::get_info() {
@@ -93,13 +74,12 @@ bool DecklinkDevice::wait_for_profile_id(const BMDProfileID profile_id) {
   const auto res = device->QueryInterface(IID_IDeckLinkProfileAttributes, (void**)&profileAttributes);
   if (res != S_OK) return false;
 
-  int64_t value;
   auto start_time = std::chrono::steady_clock::now();
   bool success = false;
 
   while (true) {
-    profileAttributes->GetInt(BMDDeckLinkProfileID, &value);
-    if (value == profile_id) {
+    int64_t value = 0;
+    if (profileAttributes->GetInt(BMDDeckLinkProfileID, &value) == S_OK && value == profile_id) {
       success = true;
       break;
     } else if (std::chrono::steady_clock::now() - start_time > std::chrono::seconds(1)) {
@@ -163,13 +143,13 @@ std::vector<std::string> DecklinkDevice::get_peer_devices() {
         continue;
       }
 
-      decklink_string_t name;
-      dev->GetDisplayName(&name);
-      std::string peer_name;
-      decklink_string_to_std_string(name, peer_name);
-      decklink_free_string(name);
-
-      result.push_back(peer_name);
+      decklink_string_t name = nullptr;
+      if (dev->GetDisplayName(&name) == S_OK) {
+        std::string peer_name;
+        decklink_string_to_std_string(name, peer_name);
+        decklink_free_string(name);
+        result.push_back(peer_name);
+      }
       dev->Release();
       peer->Release();
     }
@@ -187,9 +167,8 @@ bool DecklinkDevice::get_input_locked() {
     return false;
   }
 
-  decklink_bool_t locked;
-  status->GetFlag(bmdDeckLinkStatusVideoInputSignalLocked, &locked);
-  return locked;
+  decklink_bool_t locked = false;
+  return status->GetFlag(bmdDeckLinkStatusVideoInputSignalLocked, &locked) == S_OK && locked;
 }
 
 }  // namespace sesame_decklink

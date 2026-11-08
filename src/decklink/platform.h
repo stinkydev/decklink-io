@@ -37,12 +37,15 @@ typedef const char *decklink_string_t;
 IDeckLinkIterator *create_decklink_iterator_instance(void);
 IDeckLinkDiscovery *create_decklink_discovery_instance(void);
 IDeckLinkVideoConversion *create_video_conversion_instance(void);
-
-// Helper for REFIID comparison on Linux
-inline bool refiid_equal(REFIID a, REFIID b) {
-	return memcmp(&a, &b, sizeof(REFIID)) == 0;
-}
 #endif
+
+inline bool refiid_equal(REFIID a, REFIID b) {
+#if defined(_WIN32)
+  return a == b;
+#else
+  return memcmp(&a, &b, sizeof(REFIID)) == 0;
+#endif
+}
 
 bool decklink_string_to_std_string(decklink_string_t input, std::string &output);
 void decklink_free_string(decklink_string_t input);

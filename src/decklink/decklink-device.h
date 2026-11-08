@@ -28,9 +28,6 @@ class DecklinkDevice {
   IDeckLink* device;
   IDeckLinkStatus* status;
 
-  std::vector<IDeckLinkDisplayMode *> input_modes;
-  std::vector<IDeckLinkDisplayMode *> output_modes;
-
   bool wait_for_profile_id(const BMDProfileID profile_id);
  public:
   DecklinkDevice(IDeckLink* device, const int index);

@@ -61,34 +61,6 @@ class DecklinkDeviceEnumerator {
     std::lock_guard<std::mutex> lock(mutex);
     return devices;
   }
-
-  bool set_device_profile(const int index, const BMDProfileID profile_id) {
-    std::lock_guard<std::mutex> lock(mutex);
-    if (index < 0 || index >= devices.size()) {
-      return false;
-    }
-
-    IDeckLinkProfileManager *profileManager;
-    const auto res = devices[index]->QueryInterface(IID_IDeckLinkProfileManager, (void**)&profileManager);
-    if (res != S_OK) {
-      return false;
-    }
-
-    IDeckLinkProfile *profile;
-    const auto res2 = profileManager->GetProfile(profile_id, &profile);
-    if (res == S_OK) {
-      profile->SetActive();
-      profile->Release();
-    }
-
-    profileManager->Release();
-
-    if (res != S_OK) {
-      return false;
-    }
-  
-    return true;
-  }
 };
 
 }
