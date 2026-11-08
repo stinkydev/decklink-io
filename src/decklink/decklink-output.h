@@ -50,11 +50,13 @@ class DecklinkOutput : public IDeckLinkVideoOutputCallback, public IDeckLinkAudi
   uint32_t get_buffered_video_frames();
   uint32_t get_buffered_audio_frames();
 
-  bool start(const BMDDisplayMode mode, const int audio_channels, const bool rgba_mode);
+  bool start(const BMDDisplayMode mode, const int audio_channels, const bool rgba_mode,
+             const bool enable_timecode = false);
   void stop();
 
   bool start_scheduled_playback();
-  bool schedule_video_frame(IDeckLinkVideoFrame* frame, const uint32_t frame_nbr);
+  bool schedule_video_frame(IDeckLinkVideoFrame* frame, const uint32_t frame_nbr,
+                            const DecklinkTimecode* timecode = nullptr);
   bool schedule_audio_packet(DecklinkAudioPacket* packet);
 
   void set_completed_frame_callback(DecklinkCompletedFrameCallback callback) {

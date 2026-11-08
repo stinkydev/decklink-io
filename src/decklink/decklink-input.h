@@ -6,6 +6,7 @@
 #include <atomic>
 #include <exception>
 #include <iostream>
+#include <mutex>
 
 namespace sesame_decklink {
 
@@ -27,9 +28,18 @@ private:
   }
 
   void abort_failed_start();
+  bool supports_format_detection();
+  bool enable_video(BMDDisplayMode mode);
 
   int64_t capture_group = 0;
   bool started = false;
+  BMDVideoInputFlags video_flags = bmdVideoInputFlagDefault;
+
+  // The mode the card captures in. Written while streams are paused, read per frame on the capture thread.
+  std::mutex mode_mutex;
+  DecklinkVideoMode current_mode;
+  // A mode the card detected on the wire, until apply_detected_mode() switches to it.
+  std::atomic<BMDDisplayMode> detected_mode{bmdModeUnknown};
 
   DecklinkVideoFrameCallback on_frame = nullptr;
   DecklinkInputSignalCallback on_input_signal_changed = nullptr;
@@ -48,8 +58,25 @@ private:
     return device->get_info().displayName;
   }
 
- bool start(const BMDDisplayMode mode);
+  /**
+   * Starts capture in `mode`. With `detect_format`, and a card that supports it, capture then follows the format
+   * detected on the wire through apply_detected_mode().
+   */
+  bool start(const BMDDisplayMode mode, const bool detect_format = false);
   void stop();
+
+  /**
+   * Switches capture to the mode the card detected on the wire, when that differs from the current one. Returns
+   * true when the mode changed. Call from the thread that calls restart_streams(), never from a capture callback.
+   */
+  bool apply_detected_mode();
+
+  DecklinkVideoMode get_mode() {
+    const std::scoped_lock lock(mode_mutex);
+    return current_mode;
+  }
+
+  bool has_format_detection() const { return (video_flags & bmdVideoInputEnableFormatDetection) != 0; }
 
   void restart_streams() {
     if (input) {

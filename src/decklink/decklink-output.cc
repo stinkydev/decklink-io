@@ -44,7 +44,8 @@ bool DecklinkOutput::get_hardware_time(BMDTimeValue* time) {
   return false;
 }
 
-bool DecklinkOutput::start(const BMDDisplayMode mode, const int audio_channels, const bool rgba_mode) {
+bool DecklinkOutput::start(const BMDDisplayMode mode, const int audio_channels, const bool rgba_mode,
+                           const bool enable_timecode) {
   if (output == nullptr) {
     return false;
   }
@@ -73,7 +74,8 @@ bool DecklinkOutput::start(const BMDDisplayMode mode, const int audio_channels, 
 		} else {
 			keyer->Disable();
 		}
-	}  
+		keyer->Release();
+	}
 
   if (rgba_mode) {
     pixel_format = bmdFormat8BitBGRA;
@@ -83,7 +85,12 @@ bool DecklinkOutput::start(const BMDDisplayMode mode, const int audio_channels, 
     row_bytes = width * 2;
   }
 
-  res = output->EnableVideoOutput(mode, bmdVideoOutputFlagDefault);
+  BMDVideoOutputFlags output_flags = bmdVideoOutputFlagDefault;
+  if (enable_timecode) {
+    output_flags = (BMDVideoOutputFlags)(output_flags | bmdVideoOutputRP188);
+  }
+
+  res = output->EnableVideoOutput(mode, output_flags);
   if (res != S_OK) {
     return false;
   }
@@ -144,7 +151,8 @@ bool DecklinkOutput::start_scheduled_playback() {
   return true;
 }
 
-bool DecklinkOutput::schedule_video_frame(IDeckLinkVideoFrame* frame, const uint32_t frame_nbr) {
+bool DecklinkOutput::schedule_video_frame(IDeckLinkVideoFrame* frame, const uint32_t frame_nbr,
+                                          const DecklinkTimecode* timecode) {
 	IDeckLinkMutableVideoFrame* created_frame = nullptr;
 	if (frame == nullptr) {
 		if (output->CreateVideoFrame(width, height, (int)row_bytes, pixel_format, bmdFrameFlagDefault, &created_frame) != S_OK) {
@@ -152,8 +160,23 @@ bool DecklinkOutput::schedule_video_frame(IDeckLinkVideoFrame* frame, const uint
 		}
 	}
 
+  IDeckLinkVideoFrame* to_schedule = frame != nullptr ? frame : created_frame;
+
+  if (timecode != nullptr && timecode->valid) {
+    // Scheduled frames are recycled, so the timecode must be refreshed on
+    // every schedule; the completed frames were created as mutable frames.
+    IDeckLinkMutableVideoFrame* mutable_frame = nullptr;
+    if (to_schedule->QueryInterface(IID_IDeckLinkMutableVideoFrame, (void**)&mutable_frame) == S_OK &&
+        mutable_frame != nullptr) {
+      const BMDTimecodeFlags flags = timecode->drop_frame ? bmdTimecodeIsDropFrame : bmdTimecodeFlagDefault;
+      mutable_frame->SetTimecodeFromComponents(bmdTimecodeRP188VITC1, timecode->hours, timecode->minutes,
+                                               timecode->seconds, timecode->frames, flags);
+      mutable_frame->Release();
+    }
+  }
+
   bool res = true;
-	if (output->ScheduleVideoFrame(frame != nullptr ? frame : created_frame, ((frame_nbr) * frame_duration), frame_duration, time_scale) != S_OK) {
+	if (output->ScheduleVideoFrame(to_schedule, ((frame_nbr) * frame_duration), frame_duration, time_scale) != S_OK) {
 		res = false;
 	}
 
@@ -208,6 +231,7 @@ HRESULT	STDMETHODCALLTYPE DecklinkOutput::RenderAudioSamples(decklink_bool_t pre
 }
 
 HRESULT STDMETHODCALLTYPE DecklinkOutput::QueryInterface(REFIID iid, LPVOID* ppv) {
+  *ppv = nullptr;
   return E_NOINTERFACE;
 }
 

@@ -34,17 +34,13 @@ ULONG STDMETHODCALLTYPE DecklinkInput::AddRef() {
 }
 
 HRESULT STDMETHODCALLTYPE DecklinkInput::QueryInterface(REFIID iid, LPVOID* ppv) {
-#if defined(_WIN32)
-  if (iid == IID_IUnknown || iid == IID_IDeckLinkInputCallback) {
-#else
   if (refiid_equal(iid, IID_IUnknown) || refiid_equal(iid, IID_IDeckLinkInputCallback)) {
-#endif
-    *ppv = this;
+    *ppv = static_cast<IDeckLinkInputCallback*>(this);
     AddRef();
     return S_OK;
-  } else if (memcmp(&iid, &IID_IDeckLinkNotificationCallback,
-    sizeof(REFIID)) == 0) {
-    *ppv = (IDeckLinkNotificationCallback *)this;
+  }
+  if (refiid_equal(iid, IID_IDeckLinkNotificationCallback)) {
+    *ppv = static_cast<IDeckLinkNotificationCallback*>(this);
     AddRef();
     return S_OK;
   }
@@ -118,6 +114,14 @@ bool DecklinkInput::handle_video(IDeckLinkVideoInputFrame* frame) {
   video.linesize[0] = frame->GetRowBytes();
   video.width = frame->GetWidth();
   video.height = frame->GetHeight();
+  {
+    const std::scoped_lock lock(mode_mutex);
+    video.mode = current_mode.mode;
+    video.frame_duration = current_mode.frame_duration;
+    video.time_scale = current_mode.time_scale;
+    video.interlaced = current_mode.interlaced;
+    video.lower_field_first = current_mode.lower_field_first;
+  }
 
   BMDTimeValue hardware_time;
   BMDTimeValue frame_duration;
@@ -126,11 +130,106 @@ bool DecklinkInput::handle_video(IDeckLinkVideoInputFrame* frame) {
   } else {
     video.hardware_time = 0;
   }
+
+  video.timecode_valid = false;
+  IDeckLinkTimecode* timecode = nullptr;
+  if (frame->GetTimecode(bmdTimecodeRP188Any, &timecode) == S_OK && timecode != nullptr) {
+    uint8_t hours, minutes, seconds, frames;
+    if (timecode->GetComponents(&hours, &minutes, &seconds, &frames) == S_OK) {
+      video.tc_hours = hours;
+      video.tc_minutes = minutes;
+      video.tc_seconds = seconds;
+      video.tc_frames = frames;
+      video.tc_drop_frame = (timecode->GetFlags() & bmdTimecodeIsDropFrame) != 0;
+      video.timecode_valid = true;
+    }
+    timecode->Release();
+  }
   return true;
 }
 
-HRESULT STDMETHODCALLTYPE DecklinkInput::VideoInputFormatChanged(BMDVideoInputFormatChangedEvents events, IDeckLinkDisplayMode *, BMDDetectedVideoInputFormatFlags flags) {
+HRESULT STDMETHODCALLTYPE DecklinkInput::VideoInputFormatChanged(BMDVideoInputFormatChangedEvents, IDeckLinkDisplayMode* new_mode, BMDDetectedVideoInputFormatFlags) {
+  // Reconfiguring the card from its own callback would race restart_streams(); the owner applies it.
+  if (new_mode != nullptr) {
+    detected_mode.store(new_mode->GetDisplayMode());
+  }
   return S_OK;
+}
+
+bool DecklinkInput::apply_detected_mode() {
+  const BMDDisplayMode mode = detected_mode.exchange(bmdModeUnknown);
+  if (mode == bmdModeUnknown || input == nullptr || !started) {
+    return false;
+  }
+  const BMDDisplayMode previous = get_mode().mode;
+  if (mode == previous) {
+    return false;
+  }
+
+  input->PauseStreams();
+  const bool switched = enable_video(mode);
+  if (!switched) {
+    std::cout << "Failed to switch decklink input to detected mode" << std::endl;
+    enable_video(previous);
+  }
+  input->FlushStreams();
+  if (input->StartStreams() != S_OK) {
+    std::cout << "Failed to restart decklink input streams after a mode switch" << std::endl;
+    if (on_event != nullptr) {
+      on_event(DECKLINK_EVENT_TYPE_ERROR);
+    }
+    return false;
+  }
+
+  if (switched && on_event != nullptr) {
+    on_event(DECKLINK_EVENT_TYPE_STREAM_RESTART);
+  }
+  return switched;
+}
+
+bool DecklinkInput::supports_format_detection() {
+  IDeckLinkProfileAttributes* attributes = nullptr;
+  if (device->get_device()->QueryInterface(IID_IDeckLinkProfileAttributes, (void**)&attributes) != S_OK) {
+    return false;
+  }
+  decklink_bool_t supported = false;
+  const bool ok = attributes->GetFlag(BMDDeckLinkSupportsInputFormatDetection, &supported) == S_OK;
+  attributes->Release();
+  return ok && supported;
+}
+
+bool DecklinkInput::enable_video(const BMDDisplayMode mode) {
+  IDeckLinkDisplayMode* display_mode = nullptr;
+  if (input->GetDisplayMode(mode, &display_mode) != S_OK || display_mode == nullptr) {
+    return false;
+  }
+
+  DecklinkVideoMode info;
+  info.mode = mode;
+  info.width = static_cast<uint32_t>(display_mode->GetWidth());
+  info.height = static_cast<uint32_t>(display_mode->GetHeight());
+  BMDTimeValue frame_duration = 0;
+  BMDTimeScale time_scale = 0;
+  display_mode->GetFrameRate(&frame_duration, &time_scale);
+  info.frame_duration = frame_duration;
+  info.time_scale = time_scale;
+  // Segmented frames arrive woven into whole frames, so only true fields count as interlaced.
+  const BMDFieldDominance dominance = display_mode->GetFieldDominance();
+  info.interlaced = dominance == bmdUpperFieldFirst || dominance == bmdLowerFieldFirst;
+  info.lower_field_first = dominance == bmdLowerFieldFirst;
+  decklink_string_t name = nullptr;
+  if (display_mode->GetName(&name) == S_OK) {
+    decklink_string_to_std_string(name, info.name);
+    decklink_free_string(name);
+  }
+  display_mode->Release();
+
+  if (input->EnableVideoInput(mode, bmdFormat8BitYUV, video_flags) != S_OK) {
+    return false;
+  }
+  const std::scoped_lock lock(mode_mutex);
+  current_mode = std::move(info);
+  return true;
 }
 
 HRESULT STDMETHODCALLTYPE DecklinkInput::Notify(BMDNotifications topic, uint64_t param1, uint64_t param2) {
@@ -147,7 +246,9 @@ HRESULT STDMETHODCALLTYPE DecklinkInput::Notify(BMDNotifications topic, uint64_t
 }
 
 
-bool DecklinkInput::start(const BMDDisplayMode mode) {
+bool DecklinkInput::start(const BMDDisplayMode mode, const bool detect_format) {
+  // A detection queued by an earlier session must not switch this one.
+  detected_mode.store(bmdModeUnknown);
   auto res = input->SetCallback(this);
   if (res != S_OK) {
     return false;
@@ -160,13 +261,20 @@ bool DecklinkInput::start(const BMDDisplayMode mode) {
 		notification->Subscribe(bmdStatusChanged, this);
 	}
 
-  BMDVideoInputFlags flags = bmdVideoInputFlagDefault;
+  video_flags = bmdVideoInputFlagDefault;
   if (capture_group > 0) {
-    flags |= bmdVideoInputSynchronizeToCaptureGroup;
+    video_flags |= bmdVideoInputSynchronizeToCaptureGroup;
+  }
+  if (detect_format && supports_format_detection()) {
+    video_flags |= bmdVideoInputEnableFormatDetection;
   }
 
-  res = input->EnableVideoInput(mode, bmdFormat8BitYUV, flags);
-  if (res != S_OK) {
+  bool enabled = enable_video(mode);
+  if (!enabled && has_format_detection()) {
+    video_flags &= ~bmdVideoInputEnableFormatDetection;
+    enabled = enable_video(mode);
+  }
+  if (!enabled) {
     abort_failed_start();
     return false;
   }
@@ -210,11 +318,11 @@ DecklinkInput::DecklinkInput(DecklinkDevice* device, IDeckLinkMemoryAllocator* a
 
   IDeckLinkConfiguration* config = nullptr;
   if (dev->QueryInterface(IID_IDeckLinkConfiguration, (void**)&config) != S_OK) {
-    config = nullptr;
     throw std::runtime_error("Failed to get configuration interface for decklink device");
   }
-
-  if (config->SetInt(bmdDeckLinkConfigCaptureGroup, group) != S_OK) {
+  const bool group_set = config->SetInt(bmdDeckLinkConfigCaptureGroup, group) == S_OK;
+  config->Release();
+  if (!group_set) {
     throw std::runtime_error("Failed to set capture group for decklink device");
   }
 

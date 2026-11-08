@@ -2,6 +2,7 @@
 
 #include <functional>
 #include <cstdint>
+#include <string>
 #include "platform.h"
 
 #define DECKLINK_TIME_BASE 1000000000
@@ -13,7 +14,29 @@ struct DecklinkVideoFrame {
   uint32_t height;
   uint64_t timestamp;
   uint64_t hardware_time;
+  // The capture mode the frame arrived in. Frame rate is time_scale / frame_duration frames per second.
+  BMDDisplayMode mode;
+  int64_t frame_duration;
+  int64_t time_scale;
   bool interlaced;
+  bool lower_field_first;
+  bool timecode_valid;
+  uint8_t tc_hours;
+  uint8_t tc_minutes;
+  uint8_t tc_seconds;
+  uint8_t tc_frames;
+  bool tc_drop_frame;
+};
+
+struct DecklinkVideoMode {
+  BMDDisplayMode mode = bmdModeUnknown;
+  std::string name;
+  uint32_t width = 0;
+  uint32_t height = 0;
+  int64_t frame_duration = 0;
+  int64_t time_scale = 0;
+  bool interlaced = false;
+  bool lower_field_first = false;
 };
 
 struct DecklinkAudioPacket {
@@ -21,6 +44,15 @@ struct DecklinkAudioPacket {
   uint64_t timestamp;
   uint8_t* data;
   uint32_t channels;
+};
+
+struct DecklinkTimecode {
+  bool valid;
+  uint8_t hours;
+  uint8_t minutes;
+  uint8_t seconds;
+  uint8_t frames;
+  bool drop_frame;
 };
 
 enum DecklinkEventType {
