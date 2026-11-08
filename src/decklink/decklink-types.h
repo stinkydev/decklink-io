@@ -15,6 +15,7 @@ struct DecklinkVideoFrame {
   uint64_t timestamp;
   uint64_t hardware_time;
   // The capture mode the frame arrived in. Frame rate is time_scale / frame_duration frames per second.
+  BMDDisplayMode mode;
   int64_t frame_duration;
   int64_t time_scale;
   bool interlaced;

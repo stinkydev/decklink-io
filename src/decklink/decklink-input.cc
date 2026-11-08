@@ -116,6 +116,7 @@ bool DecklinkInput::handle_video(IDeckLinkVideoInputFrame* frame) {
   video.height = frame->GetHeight();
   {
     const std::scoped_lock lock(mode_mutex);
+    video.mode = current_mode.mode;
     video.frame_duration = current_mode.frame_duration;
     video.time_scale = current_mode.time_scale;
     video.interlaced = current_mode.interlaced;
