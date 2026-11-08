@@ -173,7 +173,13 @@ bool DecklinkInput::apply_detected_mode() {
     enable_video(previous);
   }
   input->FlushStreams();
-  input->StartStreams();
+  if (input->StartStreams() != S_OK) {
+    std::cout << "Failed to restart decklink input streams after a mode switch" << std::endl;
+    if (on_event != nullptr) {
+      on_event(DECKLINK_EVENT_TYPE_ERROR);
+    }
+    return false;
+  }
 
   if (switched && on_event != nullptr) {
     on_event(DECKLINK_EVENT_TYPE_STREAM_RESTART);
@@ -241,6 +247,8 @@ HRESULT STDMETHODCALLTYPE DecklinkInput::Notify(BMDNotifications topic, uint64_t
 
 
 bool DecklinkInput::start(const BMDDisplayMode mode, const bool detect_format) {
+  // A detection queued by an earlier session must not switch this one.
+  detected_mode.store(bmdModeUnknown);
   auto res = input->SetCallback(this);
   if (res != S_OK) {
     return false;
